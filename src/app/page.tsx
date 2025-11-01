@@ -100,43 +100,7 @@ export default function Home() {
     setTimeout(() => {
       try {
         let result = "";
-        const consoleLogRegex = /console\.log\(([\s\S]*?)\);?/g;
-        const printRegex = /print\(([\s\S]*?)\)/g;
-        const coutRegex = /std::cout << ([\s\S]*?);/g;
-        const printlnRegex = /System\.out\.println\(([\s\S]*?)\);?/g;
-        const printfRegex = /printf\(([\s\S]*?)\);?/g;
-        const putsRegex = /puts ([\s\S]*)/g;
-
         let outputLines: string[] = [];
-
-        const extractContent = (match: string, regex: RegExp, entireCode: string) => {
-          // Reset regex from previous exec
-          const freshRegex = new RegExp(regex.source, 'g');
-          const innerMatch = freshRegex.exec(match);
-          if (innerMatch && innerMatch[1]) {
-            try {
-              // This is a more robust, but still sandboxed, eval.
-              const result = new Function(`${entireCode}; return ${innerMatch[1]}`)();
-              if (Array.isArray(result)) {
-                return `[${result.join(', ')}]`;
-              }
-              return result.toString();
-            } catch (e) {
-               // Fallback for simple values if function execution fails
-               try {
-                 // eslint-disable-next-line no-eval
-                 const evaluated = eval(innerMatch[1]);
-                 if (typeof evaluated === 'object') {
-                   return JSON.stringify(evaluated);
-                 }
-                 return evaluated.toString();
-               } catch {
-                 return innerMatch[1].replace(/['"`]/g, '');
-               }
-            }
-          }
-          return '';
-        };
 
         const extractSimpleContent = (match: string, regex: RegExp) => {
             const freshRegex = new RegExp(regex.source, 'g');
@@ -152,39 +116,72 @@ export default function Home() {
             }
             return '';
         }
+        
+        const executeJs = (jsCode: string) => {
+            const output: any[] = [];
+            const originalLog = console.log;
+            console.log = (...args) => {
+                const formattedArgs = args.map(arg => {
+                    if (Array.isArray(arg)) {
+                        return `[${arg.join(', ')}]`;
+                    }
+                    if (typeof arg === 'object' && arg !== null) {
+                        return JSON.stringify(arg);
+                    }
+                    return String(arg);
+                });
+                output.push(formattedArgs.join(' '));
+            };
+            try {
+                new Function(jsCode)();
+            } catch(e) {
+                if (e instanceof Error) {
+                    output.push(`Error: ${e.message}`);
+                } else {
+                    output.push("An unknown error occurred.");
+                }
+            } finally {
+                console.log = originalLog;
+            }
+            return output;
+        }
+
 
         switch (language) {
           case 'javascript':
             result += `> node script.js\n`;
-            Array.from(code.matchAll(consoleLogRegex)).forEach(match => {
-               outputLines.push(extractContent(match[0], consoleLogRegex, code));
-            });
+            outputLines = executeJs(code);
             break;
           case 'python':
+            const printRegex = /print\(([\s\S]*?)\)/g;
             result += `> python script.py\n`;
              Array.from(code.matchAll(printRegex)).forEach(match => {
                outputLines.push(extractSimpleContent(match[0], printRegex));
             });
             break;
           case 'cpp':
+            const coutRegex = /std::cout << ([\s\S]*?);/g;
             result += `> g++ main.cpp -o main && ./main\n`;
             Array.from(code.matchAll(coutRegex)).forEach(match => {
               outputLines.push(extractSimpleContent(match[0], coutRegex));
             });
             break;
           case 'java':
+            const printlnRegex = /System\.out\.println\(([\s\S]*?)\);?/g;
             result += `> javac Main.java && java Main\n`;
             Array.from(code.matchAll(printlnRegex)).forEach(match => {
                outputLines.push(extractSimpleContent(match[0], printlnRegex));
             });
             break;
           case 'c':
+            const printfRegex = /printf\(([\s\S]*?)\);?/g;
             result += `> gcc main.c -o main && ./main\n`;
             Array.from(code.matchAll(printfRegex)).forEach(match => {
                outputLines.push(extractSimpleContent(match[0], printfRegex));
             });
             break;
           case 'ruby':
+            const putsRegex = /puts ([\s\S]*)/g;
             result += `> ruby script.rb\n`;
             Array.from(code.matchAll(putsRegex)).forEach(match => {
                outputLines.push(extractSimpleContent(match[0], putsRegex));
