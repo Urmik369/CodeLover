@@ -118,9 +118,9 @@ export default function Home() {
         }
         
         const executeJs = (jsCode: string) => {
-            const output: any[] = [];
+            const output: string[] = [];
             const originalLog = console.log;
-            console.log = (...args) => {
+            const customLog = (...args: any[]) => {
                 const formattedArgs = args.map(arg => {
                     if (Array.isArray(arg)) {
                         return `[${arg.join(', ')}]`;
@@ -132,19 +132,95 @@ export default function Home() {
                 });
                 output.push(formattedArgs.join(' '));
             };
+            
+            // Temporarily override console.log
+            console.log = customLog;
+        
             try {
-                new Function(jsCode)();
-            } catch(e) {
+                // Use a Function constructor to execute the code in a limited scope
+                new Function('console', jsCode)({ log: customLog });
+            } catch (e) {
                 if (e instanceof Error) {
                     output.push(`Error: ${e.message}`);
                 } else {
                     output.push("An unknown error occurred.");
                 }
             } finally {
+                // Restore original console.log
                 console.log = originalLog;
             }
             return output;
-        }
+        };
+        
+        const executePython = (pyCode: string) => {
+            const output: string[] = [];
+            // Mock input() by replacing it with a fixed value
+            const mockedCode = pyCode.replace(/input\((.*?)\)/g, '"10"'); // Mocking input to return '10'
+
+            // Super simple Python interpreter mock
+            const variables: Record<string, any> = {};
+            const lines = mockedCode.split('\n');
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (line.startsWith('#')) return;
+
+                // Handle variable assignment
+                const assignmentMatch = line.match(/^(\w+)\s*=\s*(.*)$/);
+                if (assignmentMatch) {
+                    const varName = assignmentMatch[1];
+                    const expression = assignmentMatch[2];
+                    try {
+                        // Very basic expression evaluation
+                        const value = new Function(...Object.keys(variables), `return ${expression}`)(...Object.values(variables));
+                        variables[varName] = value;
+                    } catch (e) {
+                         // Fallback for simple values if expression fails
+                        if (expression.match(/['"].*?['"]/)) {
+                            variables[varName] = expression.replace(/['"]/g, '');
+                        } else if (!isNaN(parseFloat(expression))) {
+                            variables[varName] = parseFloat(expression);
+                        } else {
+                             variables[varName] = expression;
+                        }
+                    }
+                    return;
+                }
+
+                // Handle print statement
+                const printMatch = line.match(/^print\((.*)\)$/);
+                if (printMatch) {
+                    const content = printMatch[1];
+                    const parts = content.split(',').map(p => p.trim());
+                    const lineOutput = parts.map(part => {
+                        if (part.startsWith('"') || part.startsWith("'")) {
+                            return part.slice(1, -1);
+                        }
+                        if (variables[part] !== undefined) {
+                            return variables[part];
+                        }
+                         if (part === "f-string") {
+                            const fStringMatch = content.match(/f"([^"]*)"/);
+                            if (fStringMatch) {
+                                let template = fStringMatch[1];
+                                const varMatches = template.matchAll(/{(\w+)}/g);
+                                for (const match of varMatches) {
+                                    const varName = match[1];
+                                    if(variables[varName] !== undefined) {
+                                        template = template.replace(`{${varName}}`, variables[varName]);
+                                    }
+                                }
+                                return template;
+                            }
+                        }
+                        return part; // Return as is if it's not a known variable
+                    }).join('');
+                    output.push(lineOutput);
+                }
+            });
+
+            return output;
+        };
 
 
         switch (language) {
@@ -153,11 +229,8 @@ export default function Home() {
             outputLines = executeJs(code);
             break;
           case 'python':
-            const printRegex = /print\(([\s\S]*?)\)/g;
             result += `> python script.py\n`;
-             Array.from(code.matchAll(printRegex)).forEach(match => {
-               outputLines.push(extractSimpleContent(match[0], printRegex));
-            });
+            outputLines = executePython(code);
             break;
           case 'cpp':
             const coutRegex = /std::cout << ([\s\S]*?);/g;
