@@ -14,8 +14,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,8 +44,6 @@ export default function Header({
     });
   };
 
-  const collaborators = PlaceHolderImages.slice(0, 4);
-
   return (
     <header className="flex items-center justify-between p-3 border-b bg-card h-16 shrink-0">
       <div className="flex items-center gap-4">
@@ -70,27 +66,6 @@ export default function Header({
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
-        <div className="flex -space-x-2">
-            <TooltipProvider>
-                {collaborators.map((collaborator) => (
-                    <Tooltip key={collaborator.id}>
-                        <TooltipTrigger asChild>
-                            <Avatar className="border-2 border-card">
-                                <AvatarImage src={collaborator.imageUrl} alt={collaborator.description} data-ai-hint={collaborator.imageHint} />
-                                <AvatarFallback>{collaborator.description.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>{collaborator.description}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                ))}
-            </TooltipProvider>
-            <Avatar className="border-2 border-card bg-muted">
-                <AvatarFallback>+2</AvatarFallback>
-            </Avatar>
-        </div>
-
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline"><Share2 className="mr-0 sm:mr-2"/> <span className="hidden sm:inline">Share</span></Button>
