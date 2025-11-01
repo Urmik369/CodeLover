@@ -73,42 +73,6 @@ end
 
 greet("Collaborative Coder")
 `,
-  php: `<?php
-// Welcome to CodeCollab!
-// Select a language and start coding.
-
-function greet($name) {
-    // Try changing this message!
-    echo "Hello, " . $name . "!";
-}
-
-greet("Collaborative Coder");
-?>
-`,
-  csharp: `// Welcome to CodeCollab!
-// Select a language and start coding.
-
-using System;
-
-class Program
-{
-    static void Main()
-    {
-        // Try changing this message!
-        Console.WriteLine("Hello, Collaborative Coder!");
-    }
-}
-`,
-  swift: `// Welcome to CodeCollab!
-// Select a language and start coding.
-
-func greet(name: String) {
-    // Try changing this message!
-    print("Hello, \\(name)!")
-}
-
-greet(name: "Collaborative Coder")
-`,
 };
 
 
@@ -150,15 +114,6 @@ export default function Home() {
           break;
         case "ruby":
           result = `> ruby script.rb\nHello, Collaborative Coder!`;
-          break;
-        case "php":
-          result = `> php script.php\nHello, Collaborative Coder!`;
-          break;
-        case "csharp":
-          result = `> dotnet run\nHello, Collaborative Coder!`;
-          break;
-        case "swift":
-          result = `> swift run\nHello, Collaborative Coder!`;
           break;
         default:
           result = "Language not supported for execution.";

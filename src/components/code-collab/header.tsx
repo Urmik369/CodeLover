@@ -64,9 +64,6 @@ export default function Header({
             <SelectItem value="java">Java</SelectItem>
             <SelectItem value="c">C</SelectItem>
             <SelectItem value="ruby">Ruby</SelectItem>
-            <SelectItem value="php">PHP</SelectItem>
-            <SelectItem value="csharp">C#</SelectItem>
-            <SelectItem value="swift">Swift</SelectItem>
           </SelectContent>
         </Select>
       </div>
