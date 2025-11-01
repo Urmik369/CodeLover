@@ -7,7 +7,7 @@ import CodeEditor from "@/components/code-collab/code-editor";
 import ResultPanels from "@/components/code-collab/result-panels";
 
 const initialCode: Record<string, string> = {
-  javascript: `// Welcome to CodeCollab!
+  javascript: `// Welcome to CodeLover!
 // Select a language and start coding.
 
 function greet(name) {
@@ -17,7 +17,7 @@ function greet(name) {
 
 greet("Collaborative Coder");
 `,
-  python: `# Welcome to CodeCollab!
+  python: `# Welcome to CodeLover!
 # Select a language and start coding.
 
 def greet(name):
@@ -26,7 +26,7 @@ def greet(name):
 
 greet("Collaborative Coder")
 `,
-  cpp: `// Welcome to CodeCollab!
+  cpp: `// Welcome to CodeLover!
 // Select a language and start coding.
 
 #include <iostream>
@@ -42,7 +42,7 @@ int main() {
     return 0;
 }
 `,
-  java: `// Welcome to CodeCollab!
+  java: `// Welcome to CodeLover!
 // Select a language and start coding.
 
 public class Main {
@@ -52,7 +52,7 @@ public class Main {
     }
 }
 `,
-  c: `// Welcome to CodeCollab!
+  c: `// Welcome to CodeLover!
 // Select a language and start coding.
 
 #include <stdio.h>

@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster"
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'CodeCollab',
+  title: 'CodeLover',
   description: 'An online, collaborative code editor with AI-powered assistance.',
 };
 
