@@ -121,12 +121,9 @@ export default function Home() {
         const executeJs = (jsCode: string) => {
             const output: string[] = [];
             const originalLog = console.log;
+            // Create a function to capture console.log output
             const customLog = (...args: any[]) => {
                 const formattedArgs = args.map(arg => {
-                    if (Array.isArray(arg)) {
-                        // Manually format arrays to look like JS array output
-                        return `[${arg.map(v => typeof v === 'string' ? `'${v}'` : JSON.stringify(v)).join(', ')}]`;
-                    }
                     if (typeof arg === 'object' && arg !== null) {
                         return JSON.stringify(arg, null, 2);
                     }
@@ -134,11 +131,11 @@ export default function Home() {
                 });
                 output.push(formattedArgs.join(' '));
             };
-            
+        
             console.log = customLog;
         
             try {
-                // Using a new Function constructor to execute code in a semi-isolated scope
+                // Use a new Function constructor to execute code in a semi-isolated scope
                 // This is safer than direct eval
                 new Function('console', jsCode)({ log: customLog });
             } catch (e) {
@@ -148,89 +145,100 @@ export default function Home() {
                     output.push("An unknown error occurred.");
                 }
             } finally {
+                // Restore original console.log
                 console.log = originalLog;
             }
             return output;
         };
         
         const executePython = (pyCode: string) => {
-            const output: string[] = [];
-            let inputCounter = 0;
-            const mockedInputs = ['10', '10', '5', '2'];
+          const output: string[] = [];
+          let inputCounter = 0;
+          const mockedInputs = ['10', '10', '5', '2'];
+
+          const mockedCode = pyCode.replace(/input\((.*?)\)/g, () => {
+            const val = mockedInputs[inputCounter % mockedInputs.length];
+            inputCounter++;
+            return `"${val}"`;
+          });
+
+          const variables: Record<string, any> = {};
+
+          const evaluateExpression = (expr: string): any => {
+            expr = expr.trim();
+            if (expr in variables) {
+              return variables[expr];
+            }
+            if (expr.startsWith('"') && expr.endsWith('"') || expr.startsWith("'") && expr.endsWith("'")) {
+              return expr.slice(1, -1);
+            }
+            if (!isNaN(Number(expr))) {
+              return Number(expr);
+            }
             
-            const mockedCode = pyCode.replace(/input\((.*?)\)/g, () => {
-                const val = mockedInputs[inputCounter % mockedInputs.length];
-                inputCounter++;
-                return `"${val}"`;
-            });
+            // Handle float()
+            const floatMatch = expr.match(/^float\((.*)\)$/);
+            if (floatMatch) {
+                const innerExpr = floatMatch[1];
+                const value = evaluateExpression(innerExpr);
+                return parseFloat(value);
+            }
 
-            const variables: Record<string, any> = {};
-            
-            const evaluateExpression = (expr: string) => {
-                expr = expr.trim();
-                
-                // Handle float()
-                const floatMatch = expr.match(/^float\((.*)\)$/);
-                if (floatMatch) {
-                    const innerExpr = floatMatch[1];
-                    const value = evaluateExpression(innerExpr);
-                    return parseFloat(value);
-                }
+            // Handle simple arithmetic
+            if (expr.includes('+')) {
+              return expr.split('+').map(p => evaluateExpression(p.trim())).reduce((a, b) => a + b, 0);
+            }
 
-                // Handle arithmetic
-                if (expr.includes('+')) {
-                    const parts = expr.split('+').map(p => p.trim());
-                    return parts.reduce((acc, part) => acc + evaluateExpression(part), 0);
-                }
-                
-                // Handle variable
-                if (variables[expr] !== undefined) {
-                    return variables[expr];
-                }
+            return expr; // Fallback
+          };
+          
+          const lines = mockedCode.split('\n');
+          for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (trimmedLine.startsWith('#') || !trimmedLine) continue;
 
-                // Handle literal string
-                if (expr.startsWith('"') && expr.endsWith('"') || expr.startsWith("'") && expr.endsWith("'")) {
-                    return expr.slice(1, -1);
-                }
+              const assignmentMatch = trimmedLine.match(/^(\w+)\s*=\s*(.*)$/);
+              if (assignmentMatch) {
+                  const [, varName, expression] = assignmentMatch;
+                  variables[varName] = evaluateExpression(expression);
+                  continue;
+              }
 
-                // Handle literal number
-                if (!isNaN(Number(expr))) {
-                    return Number(expr);
-                }
+              const printMatch = trimmedLine.match(/^print\((.*)\)$/);
+              if (printMatch) {
+                  let content = printMatch[1].trim();
 
-                return expr; // Fallback
-            };
+                  // Handle f-string
+                  if (content.startsWith('f"') || content.startsWith("f'")) {
+                      content = content.slice(2, -1);
+                      const formatted = content.replace(/\{(.+?)\}/g, (_, varName) => {
+                          return variables[varName.trim()] ?? '';
+                      });
+                      output.push(formatted);
+                      continue;
+                  }
+                  
+                  // Handle .format()
+                  const formatMatch = content.match(/^(['"])(.*?)\1\.format\((.*?)\)$/);
+                  if (formatMatch) {
+                      let template = formatMatch[2];
+                      const args = formatMatch[3].split(',').map(arg => evaluateExpression(arg.trim()));
+                      const formatted = template.replace(/\{(\d+)\}/g, (_, index) => {
+                          return args[parseInt(index)] ?? '';
+                      });
+                      output.push(formatted);
+                      continue;
+                  }
 
-            const lines = mockedCode.split('\n');
-            lines.forEach(line => {
-                line = line.trim();
-                if (line.startsWith('#') || !line) return;
-
-                // Handle variable assignment
-                const assignmentMatch = line.match(/^(\w+)\s*=\s*(.*)$/);
-                if (assignmentMatch) {
-                    const varName = assignmentMatch[1];
-                    const expression = assignmentMatch[2];
-                    variables[varName] = evaluateExpression(expression);
-                    return;
-                }
-
-                // Handle print statement
-                const printMatch = line.match(/^print\((.*)\)$/);
-                if (printMatch) {
-                    const content = printMatch[1];
-                    const parts = content.split(',').map(p => p.trim());
-                    
-                    const lineOutput = parts.map(part => {
-                        const evaluatedPart = evaluateExpression(part);
-                        // Mimic Python's print, which converts non-strings
-                        return String(evaluatedPart);
-                    }).join(''); // Python's print with comma adds a space, but for this simple mock, we'll join without.
-                    output.push(lineOutput);
-                }
-            });
-
-            return output;
+                  // Handle simple print with variables
+                  const parts = content.split(',').map(part => {
+                      const evaluated = evaluateExpression(part.trim());
+                      return (typeof evaluated === 'string') ? evaluated : String(evaluated);
+                  });
+                  output.push(parts.join(' '));
+              }
+          }
+          return output;
         };
 
 
@@ -323,5 +331,6 @@ export default function Home() {
     </div>
   );
 }
+    
 
     
