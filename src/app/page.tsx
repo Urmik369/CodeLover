@@ -100,65 +100,94 @@ export default function Home() {
     setTimeout(() => {
       try {
         let result = "";
-        const consoleLogRegex = /console\.log\((.*?)\);?/g;
-        const printRegex = /print\((.*?)\)/g;
-        const coutRegex = /std::cout << (.*?);/g;
-        const printlnRegex = /System\.out\.println\((.*?)\);?/g;
-        const printfRegex = /printf\((.*?)\);?/g;
-        const putsRegex = /puts (.*)/g;
+        const consoleLogRegex = /console\.log\(([\s\S]*?)\);?/g;
+        const printRegex = /print\(([\s\S]*?)\)/g;
+        const coutRegex = /std::cout << ([\s\S]*?);/g;
+        const printlnRegex = /System\.out\.println\(([\s\S]*?)\);?/g;
+        const printfRegex = /printf\(([\s\S]*?)\);?/g;
+        const putsRegex = /puts ([\s\S]*)/g;
 
         let outputLines: string[] = [];
 
-        const extractContent = (match: string, regex: RegExp) => {
-          const innerMatch = regex.exec(match);
+        const extractContent = (match: string, regex: RegExp, entireCode: string) => {
+          // Reset regex from previous exec
+          const freshRegex = new RegExp(regex.source, 'g');
+          const innerMatch = freshRegex.exec(match);
           if (innerMatch && innerMatch[1]) {
-            // Naive removal of quotes and evaluation of simple string concatenation
             try {
-               // eslint-disable-next-line no-eval
-              const evaluated = eval(innerMatch[1]);
-              return evaluated.toString();
-            } catch {
-              return innerMatch[1].replace(/['"`]/g, '');
+              // This is a more robust, but still sandboxed, eval.
+              const result = new Function(`${entireCode}; return ${innerMatch[1]}`)();
+              if (Array.isArray(result)) {
+                return `[${result.join(', ')}]`;
+              }
+              return result.toString();
+            } catch (e) {
+               // Fallback for simple values if function execution fails
+               try {
+                 // eslint-disable-next-line no-eval
+                 const evaluated = eval(innerMatch[1]);
+                 if (typeof evaluated === 'object') {
+                   return JSON.stringify(evaluated);
+                 }
+                 return evaluated.toString();
+               } catch {
+                 return innerMatch[1].replace(/['"`]/g, '');
+               }
             }
           }
           return '';
         };
 
+        const extractSimpleContent = (match: string, regex: RegExp) => {
+            const freshRegex = new RegExp(regex.source, 'g');
+            const innerMatch = freshRegex.exec(match);
+            if (innerMatch && innerMatch[1]) {
+                try {
+                    // eslint-disable-next-line no-eval
+                    const evaluated = eval(innerMatch[1]);
+                    return evaluated.toString();
+                } catch {
+                    return innerMatch[1].replace(/['"`]/g, '').replace(/ << std::endl/g, '').replace(/\\n/g, '');
+                }
+            }
+            return '';
+        }
+
         switch (language) {
           case 'javascript':
             result += `> node script.js\n`;
-            code.match(consoleLogRegex)?.forEach(line => {
-               outputLines.push(extractContent(line, new RegExp(consoleLogRegex.source)));
+            Array.from(code.matchAll(consoleLogRegex)).forEach(match => {
+               outputLines.push(extractContent(match[0], consoleLogRegex, code));
             });
             break;
           case 'python':
             result += `> python script.py\n`;
-             code.match(printRegex)?.forEach(line => {
-               outputLines.push(extractContent(line, new RegExp(printRegex.source)));
+             Array.from(code.matchAll(printRegex)).forEach(match => {
+               outputLines.push(extractSimpleContent(match[0], printRegex));
             });
             break;
           case 'cpp':
             result += `> g++ main.cpp -o main && ./main\n`;
-            code.match(coutRegex)?.forEach(line => {
-              outputLines.push(extractContent(line, new RegExp(coutRegex.source)).replace(/ << std::endl/, ''));
+            Array.from(code.matchAll(coutRegex)).forEach(match => {
+              outputLines.push(extractSimpleContent(match[0], coutRegex));
             });
             break;
           case 'java':
             result += `> javac Main.java && java Main\n`;
-            code.match(printlnRegex)?.forEach(line => {
-               outputLines.push(extractContent(line, new RegExp(printlnRegex.source)));
+            Array.from(code.matchAll(printlnRegex)).forEach(match => {
+               outputLines.push(extractSimpleContent(match[0], printlnRegex));
             });
             break;
           case 'c':
             result += `> gcc main.c -o main && ./main\n`;
-            code.match(printfRegex)?.forEach(line => {
-               outputLines.push(extractContent(line, new RegExp(printfRegex.source)).replace(/\\n/g, ''));
+            Array.from(code.matchAll(printfRegex)).forEach(match => {
+               outputLines.push(extractSimpleContent(match[0], printfRegex));
             });
             break;
           case 'ruby':
             result += `> ruby script.rb\n`;
-            code.match(putsRegex)?.forEach(line => {
-               outputLines.push(extractContent(line, new RegExp(putsRegex.source)));
+            Array.from(code.matchAll(putsRegex)).forEach(match => {
+               outputLines.push(extractSimpleContent(match[0], putsRegex));
             });
             break;
           default:
