@@ -169,7 +169,7 @@ export default function Home() {
             if (expr in variables) {
               return variables[expr];
             }
-            if (expr.startsWith('"') && expr.endsWith('"') || expr.startsWith("'") && expr.endsWith("'")) {
+            if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
               return expr.slice(1, -1);
             }
             if (!isNaN(Number(expr))) {
@@ -223,8 +223,10 @@ export default function Home() {
                   if (formatMatch) {
                       let template = formatMatch[2];
                       const args = formatMatch[3].split(',').map(arg => evaluateExpression(arg.trim()));
-                      const formatted = template.replace(/\{(\d+)\}/g, (_, index) => {
-                          return args[parseInt(index)] ?? '';
+                      let i = 0;
+                      const formatted = template.replace(/\{(\d*)\}/g, (_, index) => {
+                          const argIndex = index ? parseInt(index) : i++;
+                          return args[argIndex] ?? '';
                       });
                       output.push(formatted);
                       continue;
@@ -233,6 +235,11 @@ export default function Home() {
                   // Handle simple print with variables
                   const parts = content.split(',').map(part => {
                       const evaluated = evaluateExpression(part.trim());
+                      // In Python, str(10.0) is '10.0'. In JS, String(10.0) can be '10'.
+                      // We can check if it's a number and format it.
+                      if (typeof evaluated === 'number') {
+                          return evaluated.toString();
+                      }
                       return (typeof evaluated === 'string') ? evaluated : String(evaluated);
                   });
                   output.push(parts.join(' '));
