@@ -1,9 +1,9 @@
 # CodeLover
 
 <div align="center">
-  <img src="./ss/first.jpeg" alt="" width="32%" />
-  <img src="./ss/second.png" alt="" width="32%" />
-  <img src="./ss/third.png" alt="" width="32%" />
+  <img src="./ss/first.jpeg" alt="" width="64%" />
+  <img src="./ss/second.png" alt="" width="64%" />
+  <img src="./ss/third.png" alt="" width="64%" />
 </div>
 
 <br/>
