@@ -203,12 +203,20 @@ export default function Home() {
             }
 
             // Handle simple arithmetic
-            if (expr.includes('+')) {
-              const parts = expr.split('+').map(p => p.trim());
-              const values = parts.map(p => evaluateExpression(p));
-              if (values.every(v => typeof v === 'number')) {
-                return values.reduce((a, b) => a + b, 0);
-              }
+            const operators = ['+', '-', '*', '/'];
+            for (const op of operators) {
+                if (expr.includes(op)) {
+                    const parts = expr.split(op).map(p => p.trim());
+                    const values = parts.map(p => evaluateExpression(p));
+                    if (values.every(v => typeof v === 'number')) {
+                        switch (op) {
+                            case '+': return values.reduce((a, b) => a + b);
+                            case '-': return values.reduce((a, b) => a - b);
+                            case '*': return values.reduce((a, b) => a * b);
+                            case '/': return values.reduce((a, b) => a / b);
+                        }
+                    }
+                }
             }
 
             return expr; // Fallback
@@ -261,6 +269,77 @@ export default function Home() {
                       return String(evaluated);
                   });
                   output.push(parts.join(' '));
+              }
+          }
+          return output;
+        };
+
+        const executeC = (cCode: string) => {
+          const output: string[] = [];
+          const variables: Record<string, any> = {};
+
+          const evaluateCExpression = (expr: string): any => {
+            expr = expr.trim();
+            if (expr in variables) {
+              return variables[expr];
+            }
+            if (!isNaN(Number(expr))) {
+              return Number(expr);
+            }
+             // Simple arithmetic
+             const addMatch = expr.match(/(\w+)\s*\+\s*(\w+)/);
+             if (addMatch) return evaluateCExpression(addMatch[1]) + evaluateCExpression(addMatch[2]);
+             const subMatch = expr.match(/(\w+)\s*-\s*(\w+)/);
+             if (subMatch) return evaluateCExpression(subMatch[1]) - evaluateCExpression(subMatch[2]);
+             const mulMatch = expr.match(/(\w+)\s*\*\s*(\w+)/);
+             if (mulMatch) return evaluateCExpression(mulMatch[1]) * evaluateCExpression(mulMatch[2]);
+             const divMatch = expr.match(/(\w+)\s*\/\s*(\w+)/);
+             if (divMatch) return Math.floor(evaluateCExpression(divMatch[1]) / evaluateCExpression(divMatch[2])); // Integer division
+             const modMatch = expr.match(/(\w+)\s*%\s*(\w+)/);
+             if (modMatch) return evaluateCExpression(modMatch[1]) % evaluateCExpression(modMatch[2]);
+
+            return expr; // Fallback
+          };
+          
+          const lines = cCode.split('\n');
+          for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (trimmedLine.startsWith('//') || !trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('int main()') || trimmedLine.startsWith('{') || trimmedLine.startsWith('}') || trimmedLine.startsWith('return')) continue;
+
+              // int a = 9,b = 4, c;
+              const multiDeclareMatch = trimmedLine.match(/^(int|float|char|double)\s+(.*);/);
+              if (multiDeclareMatch) {
+                  const assignments = multiDeclareMatch[2].split(',');
+                  assignments.forEach(assign => {
+                      const parts = assign.split('=').map(p => p.trim());
+                      if (parts.length === 2) {
+                          variables[parts[0]] = evaluateCExpression(parts[1]);
+                      } else {
+                          variables[parts[0]] = undefined;
+                      }
+                  });
+                  continue;
+              }
+
+              // c = a+b;
+              const assignmentMatch = trimmedLine.match(/^(\w+)\s*=\s*(.*);/);
+              if (assignmentMatch) {
+                  const [, varName, expression] = assignmentMatch;
+                  variables[varName] = evaluateCExpression(expression);
+                  continue;
+              }
+
+              // printf("a+b = %d \n",c);
+              const printfMatch = trimmedLine.match(/^printf\((.*?)\);/);
+              if (printfMatch) {
+                const args = printfMatch[1].split(',').map(a => a.trim());
+                let formatString = args.shift()?.slice(1, -1) ?? '';
+                let argIndex = 0;
+                const formatted = formatString.replace(/%d|%f/g, () => {
+                    const varName = args[argIndex++];
+                    return variables[varName] ?? 'null';
+                }).replace(/\\n/g, '\n');
+                output.push(formatted);
               }
           }
           return output;
@@ -327,11 +406,8 @@ export default function Home() {
             });
             break;
           case 'c':
-            const printfRegex = /printf\(([\s\S]*?)\);?/g;
             result += `> gcc main.c -o main && ./main\n`;
-            Array.from(code.matchAll(printfRegex)).forEach(match => {
-               outputLines.push(extractSimpleContent(match[0], printfRegex));
-            });
+            outputLines = executeC(code);
             break;
           case 'ruby':
             const putsRegex = /puts ([\s\S]*)/g;
