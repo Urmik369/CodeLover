@@ -94,34 +94,95 @@ export default function Home() {
   const handleRunCode = useCallback(() => {
     setIsExecuting(true);
     setOutput("Executing code...");
+
+    // This is a mock execution. A real implementation would
+    // use a code execution sandbox.
     setTimeout(() => {
-      let result = "";
-      switch (language) {
-        case "javascript":
-          result = `> node script.js\nHello, Collaborative Coder!`;
-          break;
-        case "python":
-          result = `> python script.py\nHello, Collaborative Coder!`;
-          break;
-        case "cpp":
-          result = `> g++ main.cpp -o main && ./main\nHello, Collaborative Coder!`;
-          break;
-        case "java":
-          result = `> javac Main.java && java Main\nHello, Collaborative Coder!`;
-          break;
-        case "c":
-          result = `> gcc main.c -o main && ./main\nHello, Collaborative Coder!`;
-          break;
-        case "ruby":
-          result = `> ruby script.rb\nHello, Collaborative Coder!`;
-          break;
-        default:
-          result = "Language not supported for execution.";
+      try {
+        let result = "";
+        const consoleLogRegex = /console\.log\((.*?)\);?/g;
+        const printRegex = /print\((.*?)\)/g;
+        const coutRegex = /std::cout << (.*?);/g;
+        const printlnRegex = /System\.out\.println\((.*?)\);?/g;
+        const printfRegex = /printf\((.*?)\);?/g;
+        const putsRegex = /puts (.*)/g;
+
+        let outputLines: string[] = [];
+
+        const extractContent = (match: string, regex: RegExp) => {
+          const innerMatch = regex.exec(match);
+          if (innerMatch && innerMatch[1]) {
+            // Naive removal of quotes and evaluation of simple string concatenation
+            try {
+               // eslint-disable-next-line no-eval
+              const evaluated = eval(innerMatch[1]);
+              return evaluated.toString();
+            } catch {
+              return innerMatch[1].replace(/['"`]/g, '');
+            }
+          }
+          return '';
+        };
+
+        switch (language) {
+          case 'javascript':
+            result += `> node script.js\n`;
+            code.match(consoleLogRegex)?.forEach(line => {
+               outputLines.push(extractContent(line, new RegExp(consoleLogRegex.source)));
+            });
+            break;
+          case 'python':
+            result += `> python script.py\n`;
+             code.match(printRegex)?.forEach(line => {
+               outputLines.push(extractContent(line, new RegExp(printRegex.source)));
+            });
+            break;
+          case 'cpp':
+            result += `> g++ main.cpp -o main && ./main\n`;
+            code.match(coutRegex)?.forEach(line => {
+              outputLines.push(extractContent(line, new RegExp(coutRegex.source)).replace(/ << std::endl/, ''));
+            });
+            break;
+          case 'java':
+            result += `> javac Main.java && java Main\n`;
+            code.match(printlnRegex)?.forEach(line => {
+               outputLines.push(extractContent(line, new RegExp(printlnRegex.source)));
+            });
+            break;
+          case 'c':
+            result += `> gcc main.c -o main && ./main\n`;
+            code.match(printfRegex)?.forEach(line => {
+               outputLines.push(extractContent(line, new RegExp(printfRegex.source)).replace(/\\n/g, ''));
+            });
+            break;
+          case 'ruby':
+            result += `> ruby script.rb\n`;
+            code.match(putsRegex)?.forEach(line => {
+               outputLines.push(extractContent(line, new RegExp(putsRegex.source)));
+            });
+            break;
+          default:
+            result = "Language not supported for execution.";
+        }
+        
+        if (outputLines.length > 0) {
+            result += outputLines.join('\n');
+        } else if (result && !outputLines.length && language !== 'default') {
+            result += "No output was printed to the console.";
+        }
+
+        setOutput(result || "No executable code found or language not supported.");
+      } catch (e) {
+        if (e instanceof Error) {
+            setOutput(`An error occurred during execution: \n${e.message}`);
+        } else {
+            setOutput("An unknown error occurred during execution.");
+        }
+      } finally {
+        setIsExecuting(false);
       }
-      setOutput(result);
-      setIsExecuting(false);
     }, 1500);
-  }, [language]);
+  }, [language, code]);
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
