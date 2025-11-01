@@ -108,11 +108,21 @@ export default function Home() {
             const innerMatch = freshRegex.exec(match);
             if (innerMatch && innerMatch[1]) {
                 try {
+                    // This is a simple attempt to handle chained C++ cout
+                    if (language === 'cpp') {
+                        return innerMatch[1]
+                            .split('<<')
+                            .map(part => part.trim())
+                            .filter(part => part !== 'endl' && part !== 'std::endl')
+                            .map(part => part.replace(/["'\\]/g, ''))
+                            .join('')
+                            .replace(/\\n/g, '\n');
+                    }
                     // eslint-disable-next-line no-eval
                     const evaluated = eval(innerMatch[1]);
                     return evaluated.toString();
                 } catch {
-                    return innerMatch[1].replace(/['"`]/g, '').replace(/ << std::endl/g, '').replace(/\\n/g, '');
+                     return innerMatch[1].replace(/['"`]/g, '').replace(/ << std::endl/g, '').replace(/\\n/g, '');
                 }
             }
             return '';
@@ -136,7 +146,6 @@ export default function Home() {
         
             try {
                 // Use a new Function constructor to execute code in a semi-isolated scope
-                // This is safer than direct eval
                 new Function('console', jsCode)({ log: customLog });
             } catch (e) {
                 if (e instanceof Error) {
@@ -154,7 +163,7 @@ export default function Home() {
         const executePython = (pyCode: string) => {
           const output: string[] = [];
           let inputCounter = 0;
-          const mockedInputs = ['10', '10', '5', '2'];
+          const mockedInputs = ['10', '10.0', '5', '2'];
 
           const mockedCode = pyCode.replace(/input\((.*?)\)/g, () => {
             const val = mockedInputs[inputCounter % mockedInputs.length];
@@ -235,12 +244,7 @@ export default function Home() {
                   // Handle simple print with variables
                   const parts = content.split(',').map(part => {
                       const evaluated = evaluateExpression(part.trim());
-                      // In Python, str(10.0) is '10.0'. In JS, String(10.0) can be '10'.
-                      // We can check if it's a number and format it.
-                      if (typeof evaluated === 'number') {
-                          return evaluated.toString();
-                      }
-                      return (typeof evaluated === 'string') ? evaluated : String(evaluated);
+                      return String(evaluated);
                   });
                   output.push(parts.join(' '));
               }
@@ -262,7 +266,21 @@ export default function Home() {
             const coutRegex = /(?:std::)?cout << ([\s\S]*?);/g;
             result += `> g++ main.cpp -o main && ./main\n`;
             Array.from(code.matchAll(coutRegex)).forEach(match => {
-              outputLines.push(extractSimpleContent(match[0], coutRegex));
+                const line = match[1]
+                  .split('<<')
+                  .map(part => {
+                      part = part.trim();
+                      if (part === 'endl' || part === 'std::endl') return '\n';
+                      // A very basic attempt to simulate variable output
+                      // This does not handle scope or types.
+                      const variableMatch = code.match(new RegExp(`(int|string|char|double|float)\\s+${part}\\s*=\\s*(.*?);`));
+                      if (variableMatch) {
+                         return variableMatch[2].replace(/["']/g, '');
+                      }
+                      return part.replace(/"/g, '');
+                  })
+                  .join('');
+                outputLines.push(line);
             });
             break;
           case 'java':
@@ -291,7 +309,7 @@ export default function Home() {
         }
         
         if (outputLines.length > 0) {
-            result += outputLines.join('\n');
+            result += outputLines.join('').replace(/\n\n/g, '\n');
         } else if (result && !outputLines.length && language !== 'default') {
             result += "No output was printed to the console.";
         }
