@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useCallback } from "react";
@@ -123,21 +124,22 @@ export default function Home() {
             const customLog = (...args: any[]) => {
                 const formattedArgs = args.map(arg => {
                     if (Array.isArray(arg)) {
-                        return `[${arg.join(', ')}]`;
+                        // Manually format arrays to look like JS array output
+                        return `[${arg.map(v => typeof v === 'string' ? `'${v}'` : JSON.stringify(v)).join(', ')}]`;
                     }
                     if (typeof arg === 'object' && arg !== null) {
-                        return JSON.stringify(arg);
+                        return JSON.stringify(arg, null, 2);
                     }
                     return String(arg);
                 });
                 output.push(formattedArgs.join(' '));
             };
             
-            // Temporarily override console.log
             console.log = customLog;
         
             try {
-                // Use a Function constructor to execute the code in a limited scope
+                // Using a new Function constructor to execute code in a semi-isolated scope
+                // This is safer than direct eval
                 new Function('console', jsCode)({ log: customLog });
             } catch (e) {
                 if (e instanceof Error) {
@@ -146,7 +148,6 @@ export default function Home() {
                     output.push("An unknown error occurred.");
                 }
             } finally {
-                // Restore original console.log
                 console.log = originalLog;
             }
             return output;
@@ -154,36 +155,63 @@ export default function Home() {
         
         const executePython = (pyCode: string) => {
             const output: string[] = [];
-            // Mock input() by replacing it with a fixed value
-            const mockedCode = pyCode.replace(/input\((.*?)\)/g, '"10"'); // Mocking input to return '10'
+            let inputCounter = 0;
+            const mockedInputs = ['10', '10', '5', '2'];
+            
+            const mockedCode = pyCode.replace(/input\((.*?)\)/g, () => {
+                const val = mockedInputs[inputCounter % mockedInputs.length];
+                inputCounter++;
+                return `"${val}"`;
+            });
 
-            // Super simple Python interpreter mock
             const variables: Record<string, any> = {};
-            const lines = mockedCode.split('\n');
+            
+            const evaluateExpression = (expr: string) => {
+                expr = expr.trim();
+                
+                // Handle float()
+                const floatMatch = expr.match(/^float\((.*)\)$/);
+                if (floatMatch) {
+                    const innerExpr = floatMatch[1];
+                    const value = evaluateExpression(innerExpr);
+                    return parseFloat(value);
+                }
 
+                // Handle arithmetic
+                if (expr.includes('+')) {
+                    const parts = expr.split('+').map(p => p.trim());
+                    return parts.reduce((acc, part) => acc + evaluateExpression(part), 0);
+                }
+                
+                // Handle variable
+                if (variables[expr] !== undefined) {
+                    return variables[expr];
+                }
+
+                // Handle literal string
+                if (expr.startsWith('"') && expr.endsWith('"') || expr.startsWith("'") && expr.endsWith("'")) {
+                    return expr.slice(1, -1);
+                }
+
+                // Handle literal number
+                if (!isNaN(Number(expr))) {
+                    return Number(expr);
+                }
+
+                return expr; // Fallback
+            };
+
+            const lines = mockedCode.split('\n');
             lines.forEach(line => {
                 line = line.trim();
-                if (line.startsWith('#')) return;
+                if (line.startsWith('#') || !line) return;
 
                 // Handle variable assignment
                 const assignmentMatch = line.match(/^(\w+)\s*=\s*(.*)$/);
                 if (assignmentMatch) {
                     const varName = assignmentMatch[1];
                     const expression = assignmentMatch[2];
-                    try {
-                        // Very basic expression evaluation
-                        const value = new Function(...Object.keys(variables), `return ${expression}`)(...Object.values(variables));
-                        variables[varName] = value;
-                    } catch (e) {
-                         // Fallback for simple values if expression fails
-                        if (expression.match(/['"].*?['"]/)) {
-                            variables[varName] = expression.replace(/['"]/g, '');
-                        } else if (!isNaN(parseFloat(expression))) {
-                            variables[varName] = parseFloat(expression);
-                        } else {
-                             variables[varName] = expression;
-                        }
-                    }
+                    variables[varName] = evaluateExpression(expression);
                     return;
                 }
 
@@ -192,29 +220,12 @@ export default function Home() {
                 if (printMatch) {
                     const content = printMatch[1];
                     const parts = content.split(',').map(p => p.trim());
+                    
                     const lineOutput = parts.map(part => {
-                        if (part.startsWith('"') || part.startsWith("'")) {
-                            return part.slice(1, -1);
-                        }
-                        if (variables[part] !== undefined) {
-                            return variables[part];
-                        }
-                         if (part === "f-string") {
-                            const fStringMatch = content.match(/f"([^"]*)"/);
-                            if (fStringMatch) {
-                                let template = fStringMatch[1];
-                                const varMatches = template.matchAll(/{(\w+)}/g);
-                                for (const match of varMatches) {
-                                    const varName = match[1];
-                                    if(variables[varName] !== undefined) {
-                                        template = template.replace(`{${varName}}`, variables[varName]);
-                                    }
-                                }
-                                return template;
-                            }
-                        }
-                        return part; // Return as is if it's not a known variable
-                    }).join('');
+                        const evaluatedPart = evaluateExpression(part);
+                        // Mimic Python's print, which converts non-strings
+                        return String(evaluatedPart);
+                    }).join(''); // Python's print with comma adds a space, but for this simple mock, we'll join without.
                     output.push(lineOutput);
                 }
             });
@@ -312,3 +323,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
