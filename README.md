@@ -22,7 +22,6 @@ This is a Next.js starter project for an online code editor with AI-powered assi
 1.  **Clone the repository:**
     ```bash
     git clone <your-repository-url>
-    cd CodeLover
     ```
 
 2.  **Install dependencies:**
