@@ -1,5 +1,7 @@
 # CodeLover
 
+![CodeLover Screenshot](https://picsum.photos/seed/codelover/1200/800)
+
 This is a Next.js starter project for an online code editor with AI-powered assistance.
 
 ## ✅ Features
@@ -75,4 +77,3 @@ This project is set up to be used with Firebase Studio, which provides a seamles
 *   **Hydration Errors:** If you encounter hydration errors, ensure that any code using browser-specific APIs (like `window` or `Math.random()`) is placed inside a `useEffect` hook.
 *   **Build Failures:** Ensure you have the correct Node.js version installed and that all dependencies are properly installed by running `npm install`.
 *   **Styling Issues:** If styles are not applying correctly, check `tailwind.config.ts` and `src/app/globals.css` for any configuration errors.
-
