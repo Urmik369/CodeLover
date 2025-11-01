@@ -259,7 +259,7 @@ export default function Home() {
             outputLines = executePython(code);
             break;
           case 'cpp':
-            const coutRegex = /std::cout << ([\s\S]*?);/g;
+            const coutRegex = /(?:std::)?cout << ([\s\S]*?);/g;
             result += `> g++ main.cpp -o main && ./main\n`;
             Array.from(code.matchAll(coutRegex)).forEach(match => {
               outputLines.push(extractSimpleContent(match[0], coutRegex));
