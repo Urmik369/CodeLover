@@ -64,16 +64,6 @@ int main() {
     return 0;
 }
 `,
-  ruby: `# Welcome to CodeCollab!
-# Select a language and start coding.
-
-def greet(name)
-  # Try changing this message!
-  puts "Hello, #{name}!"
-end
-
-greet("Collaborative Coder")
-`,
 };
 
 
@@ -102,40 +92,6 @@ export default function Home() {
       try {
         let result = "";
         let outputLines: string[] = [];
-
-        const extractSimpleContent = (match: string, regex: RegExp) => {
-            const freshRegex = new RegExp(regex.source, 'g');
-            const innerMatch = freshRegex.exec(match);
-            if (innerMatch && innerMatch[1]) {
-                try {
-                    // This is a simple attempt to handle chained C++ cout
-                    if (language === 'cpp') {
-                        return innerMatch[1]
-                            .split('<<')
-                            .map(part => part.trim())
-                            .filter(part => part !== 'endl' && part !== 'std::endl')
-                            .map(part => {
-                                part = part.replace(/["'\\]/g, '');
-                                // A very basic attempt to simulate variable output
-                                // This does not handle scope or types.
-                                const variableMatch = code.match(new RegExp(`(int|string|char|double|float)\\s+${part}\\s*=\\s*(.*?);`));
-                                if (variableMatch) {
-                                   return variableMatch[2].replace(/["']/g, '');
-                                }
-                                return part;
-                            })
-                            .join('')
-                            .replace(/\\n/g, '\n');
-                    }
-                    // eslint-disable-next-line no-eval
-                    const evaluated = eval(innerMatch[1]);
-                    return evaluated.toString();
-                } catch {
-                     return innerMatch[1].replace(/['"`]/g, '').replace(/ << std::endl/g, '').replace(/\\n/g, '');
-                }
-            }
-            return '';
-        }
         
         const executeJs = (jsCode: string) => {
             const output: string[] = [];
@@ -408,13 +364,6 @@ export default function Home() {
           case 'c':
             result += `> gcc main.c -o main && ./main\n`;
             outputLines = executeC(code);
-            break;
-          case 'ruby':
-            const putsRegex = /puts ([\s\S]*)/g;
-            result += `> ruby script.rb\n`;
-            Array.from(code.matchAll(putsRegex)).forEach(match => {
-               outputLines.push(extractSimpleContent(match[0], putsRegex));
-            });
             break;
           default:
             result = "Language not supported for execution.";

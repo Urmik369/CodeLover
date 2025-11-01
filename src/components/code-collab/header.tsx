@@ -63,7 +63,6 @@ export default function Header({
             <SelectItem value="cpp">C++</SelectItem>
             <SelectItem value="java">Java</SelectItem>
             <SelectItem value="c">C</SelectItem>
-            <SelectItem value="ruby">Ruby</SelectItem>
           </SelectContent>
         </Select>
       </div>
