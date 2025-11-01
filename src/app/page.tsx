@@ -114,7 +114,16 @@ export default function Home() {
                             .split('<<')
                             .map(part => part.trim())
                             .filter(part => part !== 'endl' && part !== 'std::endl')
-                            .map(part => part.replace(/["'\\]/g, ''))
+                            .map(part => {
+                                part = part.replace(/["'\\]/g, '');
+                                // A very basic attempt to simulate variable output
+                                // This does not handle scope or types.
+                                const variableMatch = code.match(new RegExp(`(int|string|char|double|float)\\s+${part}\\s*=\\s*(.*?);`));
+                                if (variableMatch) {
+                                   return variableMatch[2].replace(/["']/g, '');
+                                }
+                                return part;
+                            })
                             .join('')
                             .replace(/\\n/g, '\n');
                     }
@@ -131,7 +140,6 @@ export default function Home() {
         const executeJs = (jsCode: string) => {
             const output: string[] = [];
             const originalLog = console.log;
-            // Create a function to capture console.log output
             const customLog = (...args: any[]) => {
                 const formattedArgs = args.map(arg => {
                     if (typeof arg === 'object' && arg !== null) {
@@ -146,6 +154,7 @@ export default function Home() {
         
             try {
                 // Use a new Function constructor to execute code in a semi-isolated scope
+                // It's not perfectly safe, but safer than direct eval for this mock scenario.
                 new Function('console', jsCode)({ log: customLog });
             } catch (e) {
                 if (e instanceof Error) {
@@ -181,21 +190,25 @@ export default function Home() {
             if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
               return expr.slice(1, -1);
             }
-            if (!isNaN(Number(expr))) {
-              return Number(expr);
-            }
-            
-            // Handle float()
+             // Handle float()
             const floatMatch = expr.match(/^float\((.*)\)$/);
             if (floatMatch) {
                 const innerExpr = floatMatch[1];
                 const value = evaluateExpression(innerExpr);
                 return parseFloat(value);
             }
+            
+            if (!isNaN(Number(expr))) {
+              return Number(expr);
+            }
 
             // Handle simple arithmetic
             if (expr.includes('+')) {
-              return expr.split('+').map(p => evaluateExpression(p.trim())).reduce((a, b) => a + b, 0);
+              const parts = expr.split('+').map(p => p.trim());
+              const values = parts.map(p => evaluateExpression(p));
+              if (values.every(v => typeof v === 'number')) {
+                return values.reduce((a, b) => a + b, 0);
+              }
             }
 
             return expr; // Fallback
@@ -233,8 +246,9 @@ export default function Home() {
                       let template = formatMatch[2];
                       const args = formatMatch[3].split(',').map(arg => evaluateExpression(arg.trim()));
                       let i = 0;
-                      const formatted = template.replace(/\{(\d*)\}/g, (_, index) => {
-                          const argIndex = index ? parseInt(index) : i++;
+                      const formatted = template.replace(/\{(\{.*?\})\}|(\{\d*\})/g, (match, escaped, normal) => {
+                          if (escaped) return escaped;
+                          const argIndex = normal.slice(1,-1) ? parseInt(normal.slice(1,-1)) : i++;
                           return args[argIndex] ?? '';
                       });
                       output.push(formatted);
@@ -263,7 +277,7 @@ export default function Home() {
             outputLines = executePython(code);
             break;
           case 'cpp':
-            const coutRegex = /(?:std::)?cout << ([\s\S]*?);/g;
+            const coutRegex = /(?:std::)?cout\s*<<\s*([\s\S]*?);/g;
             result += `> g++ main.cpp -o main && ./main\n`;
             Array.from(code.matchAll(coutRegex)).forEach(match => {
                 const line = match[1]
@@ -275,8 +289,10 @@ export default function Home() {
                       // This does not handle scope or types.
                       const variableMatch = code.match(new RegExp(`(int|string|char|double|float)\\s+${part}\\s*=\\s*(.*?);`));
                       if (variableMatch) {
-                         return variableMatch[2].replace(/["']/g, '');
+                         // remove quotes from strings
+                         return variableMatch[2].replace(/"/g, '');
                       }
+                       // remove quotes from literal strings
                       return part.replace(/"/g, '');
                   })
                   .join('');
@@ -287,7 +303,27 @@ export default function Home() {
             const printlnRegex = /System\.out\.println\(([\s\S]*?)\);?/g;
             result += `> javac Main.java && java Main\n`;
             Array.from(code.matchAll(printlnRegex)).forEach(match => {
-               outputLines.push(extractSimpleContent(match[0], printlnRegex));
+              const content = match[1].trim();
+              
+              // Handle literal strings
+              if (content.startsWith('"') && content.endsWith('"')) {
+                outputLines.push(content.slice(1, -1));
+                return;
+              }
+
+              // Handle variables
+              // This is a very basic simulation and doesn't handle scope, types perfectly etc.
+              const variableRegex = new RegExp(`(double|float|int|String)\\s+${content}\\s*=\\s*(.*?);`);
+              const variableMatch = code.match(variableRegex);
+
+              if (variableMatch && variableMatch[2]) {
+                let value = variableMatch[2].trim();
+                // Remove quotes from string literals, F from floats
+                value = value.replace(/"/g, '').replace(/F$/i, '');
+                outputLines.push(value);
+              } else {
+                 outputLines.push(content);
+              }
             });
             break;
           case 'c':
@@ -309,7 +345,7 @@ export default function Home() {
         }
         
         if (outputLines.length > 0) {
-            result += outputLines.join('').replace(/\n\n/g, '\n');
+            result += outputLines.join('\n').replace(/\n\n/g, '\n');
         } else if (result && !outputLines.length && language !== 'default') {
             result += "No output was printed to the console.";
         }
