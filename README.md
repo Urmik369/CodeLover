@@ -1,6 +1,12 @@
 # CodeLover
 
-![CodeLover Screenshot](https://picsum.photos/seed/codelover/1200/800)
+<div align="center">
+  <img src="./ss/first.jpeg" alt="CodeLover Editor" width="32%" />
+  <img src="./ss/second.png" alt="Code Execution" width="32%" />
+  <img src="./ss/third.png" alt="Multi-language Support" width="32%" />
+</div>
+
+<br/>
 
 This is a Next.js starter project for an online code editor with AI-powered assistance.
 
@@ -20,28 +26,28 @@ This is a Next.js starter project for an online code editor with AI-powered assi
 ## ✅ Installation Steps
 
 1.  **Clone the repository:**
-    ```bash
+```bash
     git clone <your-repository-url>
-    ```
+```
 
 2.  **Navigate to the project directory:**
-    ```bash
+```bash
     cd <your-repository-name>
-    ```
+```
 
 3.  **Install dependencies:**
-    ```bash
+```bash
     npm install
     # or
     yarn install
-    ```
+```
 
 4.  **Run the development server:**
-    ```bash
+```bash
     npm run dev
     # or
     yarn dev
-    ```
+```
     Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
 
 ## ✅ Quick Start Commands
@@ -52,7 +58,6 @@ This is a Next.js starter project for an online code editor with AI-powered assi
 *   `npm run lint`: Lints the codebase.
 
 ## ✅ Project Structure
-
 ```
 .
 ├── src
@@ -68,6 +73,10 @@ This is a Next.js starter project for an online code editor with AI-powered assi
 │   └── hooks
 │       └── use-toast.ts    # Toast notification hook
 ├── public                  # Static assets
+├── ss                      # Screenshots for README
+│   ├── screenshot1.png
+│   ├── screenshot2.png
+│   └── screenshot3.png
 ├── tailwind.config.ts      # Tailwind CSS configuration
 └── next.config.ts          # Next.js configuration
 ```
