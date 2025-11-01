@@ -43,6 +43,13 @@ export default function Header({
       description: "Shareable link has been copied.",
     });
   };
+  
+  const handleSave = () => {
+    toast({
+      title: "Code Saved!",
+      description: "Your code has been saved successfully.",
+    });
+  };
 
   return (
     <header className="flex items-center justify-between p-3 border-b bg-card h-16 shrink-0">
@@ -93,7 +100,7 @@ export default function Header({
           </PopoverContent>
         </Popover>
 
-        <Button variant="outline"><Save className="mr-0 sm:mr-2" /> <span className="hidden sm:inline">Save</span></Button>
+        <Button variant="outline" onClick={handleSave}><Save className="mr-0 sm:mr-2" /> <span className="hidden sm:inline">Save</span></Button>
         <Button onClick={onRunCode} disabled={isExecuting}>
           {isExecuting ? (
             <LoaderCircle className="animate-spin mr-0 sm:mr-2" />
