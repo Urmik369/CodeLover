@@ -42,6 +42,37 @@ int main() {
     return 0;
 }
 `,
+  java: `// Welcome to CodeCollab!
+// Select a language and start coding.
+
+public class Main {
+    public static void main(String[] args) {
+        // Try changing this message!
+        System.out.println("Hello, Collaborative Coder!");
+    }
+}
+`,
+  c: `// Welcome to CodeCollab!
+// Select a language and start coding.
+
+#include <stdio.h>
+
+int main() {
+    // Try changing this message!
+    printf("Hello, Collaborative Coder!\\n");
+    return 0;
+}
+`,
+  ruby: `# Welcome to CodeCollab!
+# Select a language and start coding.
+
+def greet(name)
+  # Try changing this message!
+  puts "Hello, #{name}!"
+end
+
+greet("Collaborative Coder")
+`,
 };
 
 
@@ -74,6 +105,15 @@ export default function Home() {
           break;
         case "cpp":
           result = `> g++ main.cpp -o main && ./main\nHello, Collaborative Coder!`;
+          break;
+        case "java":
+          result = `> javac Main.java && java Main\nHello, Collaborative Coder!`;
+          break;
+        case "c":
+          result = `> gcc main.c -o main && ./main\nHello, Collaborative Coder!`;
+          break;
+        case "ruby":
+          result = `> ruby script.rb\nHello, Collaborative Coder!`;
           break;
         default:
           result = "Language not supported for execution.";
