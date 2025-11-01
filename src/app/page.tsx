@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { AiCodeSuggestionsOutput } from "@/ai/flows/ai-code-suggestions";
 import Header from "@/components/code-collab/header";
 import CodeEditor from "@/components/code-collab/code-editor";
 import ResultPanels from "@/components/code-collab/result-panels";
@@ -70,8 +69,6 @@ int main() {
 export default function Home() {
   const [language, setLanguage] = useState("javascript");
   const [code, setCode] = useState(initialCode.javascript);
-  const [aiSuggestions, setAiSuggestions] = useState<AiCodeSuggestionsOutput | null>(null);
-  const [isAiRunning, setIsAiRunning] = useState(false);
   const [output, setOutput] = useState("Click 'Run' to see the output here.");
   const [isExecuting, setIsExecuting] = useState(false);
 
@@ -79,7 +76,6 @@ export default function Home() {
     setLanguage(newLanguage);
     setCode(initialCode[newLanguage] || "");
     setOutput("Click 'Run' to see the output here.");
-    setAiSuggestions(null);
   };
   
   const handleRunCode = useCallback(() => {
@@ -99,7 +95,11 @@ export default function Home() {
             const customLog = (...args: any[]) => {
                 const formattedArgs = args.map(arg => {
                     if (typeof arg === 'object' && arg !== null) {
-                        return JSON.stringify(arg, null, 2);
+                        try {
+                            return JSON.stringify(arg, null, 2);
+                        } catch (e) {
+                            return '[Circular Object]';
+                        }
                     }
                     return String(arg);
                 });
@@ -109,9 +109,7 @@ export default function Home() {
             console.log = customLog;
         
             try {
-                // Use a new Function constructor to execute code in a semi-isolated scope
-                // It's not perfectly safe, but safer than direct eval for this mock scenario.
-                new Function('console', jsCode)({ log: customLog });
+                new Function(jsCode)();
             } catch (e) {
                 if (e instanceof Error) {
                     output.push(`Error: ${e.message}`);
@@ -151,7 +149,8 @@ export default function Home() {
             if (floatMatch) {
                 const innerExpr = floatMatch[1];
                 const value = evaluateExpression(innerExpr);
-                return parseFloat(value);
+                const a = parseFloat(value);
+                return a;
             }
             
             if (!isNaN(Number(expr))) {
@@ -302,6 +301,152 @@ export default function Home() {
         };
 
 
+        const executeCpp = (cppCode: string) => {
+            const output: string[] = [];
+            const variables: Record<string, any> = {};
+
+            const evaluateCppExpression = (expr: string): any => {
+              expr = expr.trim();
+              if (expr in variables) {
+                  return variables[expr];
+              }
+              if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
+                  return expr.slice(1, -1);
+              }
+              if (!isNaN(Number(expr))) {
+                  return Number(expr);
+              }
+              // Basic arithmetic
+              const operators = ['+', '-', '*', '/'];
+              for (const op of operators) {
+                  if (expr.includes(op)) {
+                      const parts = expr.split(op).map(p => p.trim());
+                      const values = parts.map(p => evaluateCppExpression(p));
+                      if (values.every(v => typeof v === 'number')) {
+                          switch (op) {
+                              case '+': return values.reduce((a, b) => a + b);
+                              case '-': return values.reduce((a, b) => a - b);
+                              case '*': return values.reduce((a, b) => a * b);
+                              case '/': return values.reduce((a, b) => a / b);
+                          }
+                      }
+                  }
+              }
+              return expr;
+            };
+
+            const extractSimpleContent = (line: string): string => {
+                return line.split('<<').map(part => {
+                    part = part.trim();
+                    if (part === 'endl' || part === 'std::endl') return '\n';
+                    if (part in variables) return variables[part];
+                    if ((part.startsWith('"') && part.endsWith('"')) || (part.startsWith("'") && part.endsWith("'"))) {
+                        return part.slice(1, -1);
+                    }
+                    return evaluateCppExpression(part);
+                }).join('');
+            };
+
+            const lines = cppCode.split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (trimmedLine.startsWith('//') || !trimmedLine || trimmedLine.startsWith('#') || trimmedLine.includes('using namespace') || trimmedLine.startsWith('int main') || trimmedLine.startsWith('{') || trimmedLine.startsWith('}') || trimmedLine.startsWith('return')) continue;
+
+                // Variable declaration and assignment: int a = 5;
+                const declarationMatch = trimmedLine.match(/^(int|string|char|double|float)\s+([\w\s,=]+);/);
+                if (declarationMatch) {
+                    const assignments = declarationMatch[2].split(',');
+                    assignments.forEach(assign => {
+                        const parts = assign.split('=').map(p => p.trim());
+                        if (parts.length === 2) {
+                            variables[parts[0]] = evaluateCppExpression(parts[1]);
+                        } else {
+                            variables[parts[0]] = undefined;
+                        }
+                    });
+                    continue;
+                }
+
+                // Assignment to existing var: temp = a;
+                const assignmentMatch = trimmedLine.match(/^(\w+)\s*=\s*(.*);/);
+                if (assignmentMatch) {
+                    const [, varName, expression] = assignmentMatch;
+                    variables[varName] = evaluateCppExpression(expression);
+                    continue;
+                }
+                
+                // cout statement
+                const coutMatch = trimmedLine.match(/(?:std::)?cout\s*<<(.*);/);
+                if (coutMatch) {
+                    output.push(extractSimpleContent(coutMatch[1]));
+                }
+            }
+            return output;
+        };
+
+        const executeJava = (javaCode: string) => {
+            const output: string[] = [];
+            const variables: Record<string, any> = {};
+
+            const evaluateJavaExpression = (expr: string) => {
+                expr = expr.trim();
+                if (expr in variables) return variables[expr];
+                if ((expr.startsWith('"') && expr.endsWith('"'))) return expr.slice(1, -1);
+                if (expr.endsWith('F')) return parseFloat(expr.slice(0,-1));
+                if (expr.match(/^\d+(\.\d+)?(e\d+)?$/)) return Number(expr);
+                
+                const operators = ['+', '-', '*', '/'];
+                for (const op of operators) {
+                    if (expr.includes(op)) {
+                        const parts = expr.split(op).map(p => p.trim());
+                        const values = parts.map(p => evaluateJavaExpression(p));
+                        if (values.every(v => typeof v === 'number')) {
+                            switch (op) {
+                                case '+': return values.reduce((a, b) => a + b);
+                                case '-': return values.reduce((a, b) => a - b);
+                                case '*': return values.reduce((a, b) => a * b);
+                                case '/': return values.reduce((a, b) => a / b);
+                            }
+                        } else { // string concat
+                           return values.join('');
+                        }
+                    }
+                }
+                return expr;
+            };
+
+            const lines = javaCode.split('\n');
+            for(const line of lines) {
+                const trimmedLine = line.trim();
+                 if (trimmedLine.startsWith('//') || !trimmedLine || trimmedLine.startsWith('public class') || trimmedLine.startsWith('public static void') || trimmedLine.startsWith('{') || trimmedLine.startsWith('}')) continue;
+
+                // Variable declaration: double myDouble = 3.4;
+                const varMatch = trimmedLine.match(/^(double|float|int|String)\s+([\w\s,=\.]+?);/);
+                if (varMatch) {
+                   const declaration = varMatch[2];
+                   const assignments = declaration.split(',');
+                   assignments.forEach(assign => {
+                     const parts = assign.split('=').map(p => p.trim());
+                     if (parts.length === 2) {
+                       variables[parts[0]] = evaluateJavaExpression(parts[1]);
+                     } else {
+                       variables[parts[0]] = undefined;
+                     }
+                   });
+                   continue;
+                }
+                
+                // System.out.println(myDouble);
+                const printlnMatch = trimmedLine.match(/System\.out\.println\((.*)\);/);
+                if (printlnMatch) {
+                    const content = printlnMatch[1].trim();
+                    output.push(evaluateJavaExpression(content));
+                }
+            }
+            return output;
+        };
+
+
         switch (language) {
           case 'javascript':
             result += `> node script.js\n`;
@@ -312,54 +457,12 @@ export default function Home() {
             outputLines = executePython(code);
             break;
           case 'cpp':
-            const coutRegex = /(?:std::)?cout\s*<<\s*([\s\S]*?);/g;
             result += `> g++ main.cpp -o main && ./main\n`;
-            Array.from(code.matchAll(coutRegex)).forEach(match => {
-                const line = match[1]
-                  .split('<<')
-                  .map(part => {
-                      part = part.trim();
-                      if (part === 'endl' || part === 'std::endl') return '\n';
-                      // A very basic attempt to simulate variable output
-                      // This does not handle scope or types.
-                      const variableMatch = code.match(new RegExp(`(int|string|char|double|float)\\s+${part}\\s*=\\s*(.*?);`));
-                      if (variableMatch) {
-                         // remove quotes from strings
-                         return variableMatch[2].replace(/"/g, '');
-                      }
-                       // remove quotes from literal strings
-                      return part.replace(/"/g, '');
-                  })
-                  .join('');
-                outputLines.push(line);
-            });
+            outputLines = executeCpp(code);
             break;
           case 'java':
-            const printlnRegex = /System\.out\.println\(([\s\S]*?)\);?/g;
             result += `> javac Main.java && java Main\n`;
-            Array.from(code.matchAll(printlnRegex)).forEach(match => {
-              const content = match[1].trim();
-              
-              // Handle literal strings
-              if (content.startsWith('"') && content.endsWith('"')) {
-                outputLines.push(content.slice(1, -1));
-                return;
-              }
-
-              // Handle variables
-              // This is a very basic simulation and doesn't handle scope, types perfectly etc.
-              const variableRegex = new RegExp(`(double|float|int|String)\\s+${content}\\s*=\\s*(.*?);`);
-              const variableMatch = code.match(variableRegex);
-
-              if (variableMatch && variableMatch[2]) {
-                let value = variableMatch[2].trim();
-                // Remove quotes from string literals, F from floats
-                value = value.replace(/"/g, '').replace(/F$/i, '');
-                outputLines.push(value);
-              } else {
-                 outputLines.push(content);
-              }
-            });
+            outputLines = executeJava(code);
             break;
           case 'c':
             result += `> gcc main.c -o main && ./main\n`;
@@ -402,14 +505,10 @@ export default function Home() {
             code={code}
             onCodeChange={setCode}
             language={language}
-            onAiSuggestionsUpdate={setAiSuggestions}
-            onIsAiRunningUpdate={setIsAiRunning}
           />
         </div>
         <div className="flex flex-col h-full overflow-hidden min-h-0">
           <ResultPanels
-            aiSuggestions={aiSuggestions}
-            isAiRunning={isAiRunning}
             output={output}
           />
         </div>

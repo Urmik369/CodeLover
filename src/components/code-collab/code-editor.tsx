@@ -3,48 +3,20 @@
 import { useEffect, useRef, useMemo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { getAiSuggestions } from "@/app/actions";
-import type { AiCodeSuggestionsOutput } from "@/ai/flows/ai-code-suggestions";
 
 type CodeEditorProps = {
   code: string;
   onCodeChange: (code: string) => void;
   language: string;
-  onAiSuggestionsUpdate: (suggestions: AiCodeSuggestionsOutput | null) => void;
-  onIsAiRunningUpdate: (isRunning: boolean) => void;
 };
 
 export default function CodeEditor({
   code,
   onCodeChange,
   language,
-  onAiSuggestionsUpdate,
-  onIsAiRunningUpdate,
 }: CodeEditorProps) {
   const lineNumbersRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const handler = setTimeout(async () => {
-      if (code.trim().length > 20) {
-        onIsAiRunningUpdate(true);
-        try {
-          const suggestions = await getAiSuggestions({ code, language });
-          onAiSuggestionsUpdate(suggestions);
-        } catch (e) {
-          onAiSuggestionsUpdate(null);
-        } finally {
-          onIsAiRunningUpdate(false);
-        }
-      } else {
-        onAiSuggestionsUpdate(null);
-      }
-    }, 1500);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [code, language, onAiSuggestionsUpdate, onIsAiRunningUpdate]);
 
   const handleScroll = () => {
     if (lineNumbersRef.current && textareaRef.current) {
